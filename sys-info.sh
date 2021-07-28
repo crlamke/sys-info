@@ -23,34 +23,33 @@ dataFormat="%-10s %-13s %-13s %-24s %-8s"
 
 # Constants to define function behavior
 topProcessCount=5
+HTMLOutput=1
 
+cores=$(getconf _NPROCESSORS_ONLN)
+ram=$(grep 'MemTotal:' /proc/meminfo | awk '{print int($2 / 1024)}')
+hostName=$(hostname)
+hostIP=$(hostname -I)
+runDTG=$(date)
 
 # Name: reportHeader
 # Parameters: none
-# Description: Print report header
+# Description: Print report header with machine type and resource info
 function reportHeader
 {
-  # Print headers and data such as hostname and IP
-  # that won't change over script run.
-  hostName=$(hostname)
-  hostIP=$(hostname -i)
-  printf "\n\n%s %s %s\n" $reportLabelDivider "System Status Report" $reportLabelDivider
-  printf "\nHostname: %s\tHost IP: %s\n" $hostName $hostIP
-  # TODO make cmd below support more platforms
-  printf "\nOS Ver: %s\n" "$(cat /etc/redhat-release)"
-  
-}
-
-# Name: reportSystemHW
-# Parameters: none
-# Description: Report recent system changes via yum
-function reportSystemHW()
-{
-  #if [[ vmtype=$(systemd-detect-virt) ]] 
+  printf "\n\n%s %s %s %s\n\n" $reportLabelDivider "$hostName" "Status Report" \
+    $reportLabelDivider
+  printf "Report Run Time: %s\n" "$runDTG"
+  printf "Hardware Resources: %s CPU cores | %s MB RAM %s\n" "$cores" "$ram"
   vmtype=$(systemd-detect-virt)
-  printf "%s CPU cores | %s RAM | %s virtual. VM Type: %s\n" "$subReportHeader" "Recent Package Changes" "$subReportHeader" 
-  printf "yum history\n"
-  yum history
+  if [[ $? -eq 0 ]]; then
+    printf "Virtualization: Machine is a VM with \"%s\" type virtualization.\n" "$vmtype"
+  else
+    printf "Virtualization: No virtualization detected.\n"
+  fi
+  printf "Hostname: %s\n" "$hostName"
+  printf "Host IPs: %s\n" "$hostIP"
+  # TODO make cmd below support more platforms
+  printf "OS Name and Version: %s\n" "$(cat /etc/redhat-release)"
 }
 
 # Name: reportTopProcesses
@@ -64,7 +63,7 @@ function reportTopProcesses()
   printf "Top %s processes by CPU\n" $topProcessCount
   ps -Ao pcpu,comm,pid,user,uid,pmem,cmd --sort=-pcpu | head -n $processLinesToShow
   printf "\nTop %s processes by RAM\n" $topProcessCount
-  ps -Ao pmem,pcpu,comm,pid,user,uid,pcpu,cmd --sort=-pmem | head -n $processLinesToShow
+  ps -Ao pmem,pcpu,comm,pid,user,uid,cmd --sort=-pmem | head -n $processLinesToShow
 }
 
 
@@ -115,22 +114,6 @@ function reportRecentPackageChanges()
 }
 
 
-# Name: reportCurrentStatus
-# Parameters: none
-# Description: Report current system status
-function reportCurrentStatus
-{
-  printf "\n%s %s %s\n" $reportLabelDivider "Current System Status" $reportLabelDivider
-
-  reportTopProcesses
-
-  reportDiskStatus
-
-  reportRecentUsers
-
-  reportAnomalousProcesses
-}
-
 # Name: reportRecentEvents
 # Parameters: none
 # Description: Report current system status
@@ -138,7 +121,6 @@ function reportRecentEvents
 {
   printf "\n%s %s %s\n" $reportLabelDivider "Recent System Events" $reportLabelDivider
 
-  reportRecentPackageChanges
 }
 
 
@@ -158,85 +140,59 @@ function reportSuggestions
 # Description: Report on processes consuming the most RAM and CPU
 function reportFooter
 {
-  hostName=$(hostname)
-  hostIP=$(hostname -i)
-  printf "\n\nHostname: %s\tHost IP: %s\n" $hostName $hostIP
   printf "\n%s %s %s\n" $reportLabelDivider "End System Status Report" $reportLabelDivider
 }
 
-function potential-code() 
+# Name: createHTMLHeader
+# Parameters: pageTitle 
+# Description: Outputs a basic HTML header with style info.
+function createHTMLHeader
 {
-echo -e "-------------------------------System Information----------------------------"
-echo -e "Hostname:\t\t"`hostname`
-echo -e "uptime:\t\t\t"`uptime | awk '{print $3,$4}' | sed 's/,//'`
-echo -e "Manufacturer:\t\t"`cat /sys/class/dmi/id/chassis_vendor`
-echo -e "Product Name:\t\t"`cat /sys/class/dmi/id/product_name`
-echo -e "Version:\t\t"`cat /sys/class/dmi/id/product_version`
-echo -e "Serial Number:\t\t"`cat /sys/class/dmi/id/product_serial`
-echo -e "Machine Type:\t\t"`vserver=$(lscpu | grep Hypervisor | wc -l); if [ $vserver -gt 0 ]; then echo "VM"; else echo "Physical"; fi`
-echo -e "Operating System:\t"`hostnamectl | grep "Operating System" | cut -d ' ' -f5-`
-echo -e "Kernel:\t\t\t"`uname -r`
-echo -e "Architecture:\t\t"`arch`
-echo -e "Processor Name:\t\t"`awk -F':' '/^model name/ {print $2}' /proc/cpuinfo | uniq | sed -e 's/^[ \t]*//'`
-echo -e "Active User:\t\t"`w | cut -d ' ' -f1 | grep -v USER | xargs -n1`
-echo -e "System Main IP:\t\t"`hostname -I`
-echo ""
-echo -e "-------------------------------CPU/Memory Usage------------------------------"
-echo -e "Memory Usage:\t"`free | awk '/Mem/{printf("%.2f%"), $3/$2*100}'`
-echo -e "Swap Usage:\t"`free | awk '/Swap/{printf("%.2f%"), $3/$2*100}'`
-echo -e "CPU Usage:\t"`cat /proc/stat | awk '/cpu/{printf("%.2f%\n"), ($2+$4)*100/($2+$4+$5)}' |  awk '{print $0}' | head -1`
-echo ""
-echo -e "-------------------------------Disk Usage >80%-------------------------------"
-df -Ph | sed s/%//g | awk '{ if($5 > 80) print $0;}'
-echo ""
-
-echo -e "-------------------------------For WWN Details-------------------------------"
-vserver=$(lscpu | grep Hypervisor | wc -l)
-if [ $vserver -gt 0 ]
-then
-echo "$(hostname) is a VM"
-else
-cat /sys/class/fc_host/host?/port_name
-fi
-echo ""
-echo -e "-------------------------------System Information----------------------------"
-echo -e "Hostname:\t\t"`hostname`
-echo -e "uptime:\t\t\t"`uptime | awk '{print $3,$4}' | sed 's/,//'`
-echo -e "Manufacturer:\t\t"`cat /sys/class/dmi/id/chassis_vendor`
-echo -e "Product Name:\t\t"`cat /sys/class/dmi/id/product_name`
-echo -e "Version:\t\t"`cat /sys/class/dmi/id/product_version`
-echo -e "Serial Number:\t\t"`cat /sys/class/dmi/id/product_serial`
-echo -e "Machine Type:\t\t"`vserver=$(lscpu | grep Hypervisor | wc -l); if [ $vserver -gt 0 ]; then echo "VM"; else echo "Physical"; fi`
-echo -e "Operating System:\t"`hostnamectl | grep "Operating System" | cut -d ' ' -f5-`
-echo -e "Kernel:\t\t\t"`uname -r`
-echo -e "Architecture:\t\t"`arch`
-echo -e "Processor Name:\t\t"`awk -F':' '/^model name/ {print $2}' /proc/cpuinfo | uniq | sed -e 's/^[ \t]*//'`
-echo -e "Active User:\t\t"`w | cut -d ' ' -f1 | grep -v USER | xargs -n1`
-echo -e "System Main IP:\t\t"`hostname -I`
-echo ""
-echo -e "-------------------------------CPU/Memory Usage------------------------------"
-echo -e "Memory Usage:\t"`free | awk '/Mem/{printf("%.2f%"), $3/$2*100}'`
-echo -e "Swap Usage:\t"`free | awk '/Swap/{printf("%.2f%"), $3/$2*100}'`
-echo -e "CPU Usage:\t"`cat /proc/stat | awk '/cpu/{printf("%.2f%\n"), ($2+$4)*100/($2+$4+$5)}' |  awk '{print $0}' | head -1`
-echo ""
-echo -e "-------------------------------Disk Usage >80%-------------------------------"
-df -Ph | sed s/%//g | awk '{ if($5 > 80) print $0;}'
-echo ""
-
-echo -e "-------------------------------For WWN Details-------------------------------"
-vserver=$(lscpu | grep Hypervisor | wc -l)
-if [ $vserver -gt 0 ]
-then
-echo "$(hostname) is a VM"
-else
-cat /sys/class/fc_host/host?/port_name
-fi
-echo ""
-
+  header="<!DOCTYPE html><html><head><title>"
+  header+=$1
+  header+="</title></head>"
+  header+="<style>"
+  header+="</style>"
+  header+="<body>"
+  printf "%s" "$header"
 }
 
+# Name: createHTMLFooter
+# Parameters: pageTitle 
+# Description: Outputs a basic HTML footer
+function createHTMLFooter
+{
+  footer="</body></html>"
+  printf "%s" $footer
+}
 
+# Name: createHTMLTOC
+# Parameters: 
+# Description: Outputs a HTML TOC
+function createHTMLTOC
+{
+  toc="<div id=\"toc\"><p class=\"tocTitle\">Machine Status Report</p>"
+  toc+="<ul class=\"tocList\">"
+  toc+="<li><a href="#BasicInfo">Basic Machine Info</a></li>"
+  toc+="<li><a href="#TopProcesses">Top Processes</a></li>"
+  toc+="<li><a href="#DiskStats">Disk Stats</a></li>"
+  toc+="</ul></div>"
+  printf "%s" "$toc"
+}
 
+# Name: createHTMLBody
+# Parameters: 
+# Description: Outputs a HTML Body
+function createHTMLBody
+{
+  body="<h4 id=\"#BasicInfo\">Basic Machine Info</h4>"
+  body+="<p><a href="#toc">Back to Top</a></p>"
+  body+="<h4 id=\"#TopProcesses\">Top Processes</h4>"
+  body+="<p><a href="#toc">Back to Top</a></p>"
+  body+="<h4 id=\"#DiskStats\">Disk Stats</h4>"
+  body+="<p><a href="#toc">Back to Top</a></p>"
+  printf "%s" "$body"
+}
 
 # Trap ctrl + c 
 trap ctrl_c INT
@@ -255,11 +211,28 @@ fi
 
 reportHeader
 
-reportCurrentStatus
+reportTopProcesses
+
+reportDiskStatus
+
+reportAnomalousProcesses
+
+reportRecentUsers
+
+reportRecentPackageChanges
 
 reportRecentEvents
 
 reportSuggestions
 
 reportFooter
+
+if (( $HTMLOutput != 0 )); then
+  printf "Creating HTML Output\n"
+  htmlPage=$(createHTMLHeader "Test File")
+  htmlPage+=$(createHTMLTOC)
+  htmlPage+=$(createHTMLBody)
+  htmlPage+=$(createHTMLFooter)
+  echo $htmlPage >./test.html
+fi
 
