@@ -7,63 +7,114 @@
 #Copyright   : 2021 Christopher R Lamke
 #License     : MIT - See https://opensource.org/licenses/MIT
 #Last Update : 2021-06-26
-#Version     : 0.1
+#Version     : 0.2
 #Usage       : sys-info.sh
 #Notes       : 
 #
 
 # Report header and data display formats
-reportLabelDivider="--------------------"
+reportLabelDivider="********************"
 subReportHeader="****************"
 subReportFooter="****************"
 headerFormat="%-10s %-13s %-13s %-24s %-8s"
 dataFormat="%-10s %-13s %-13s %-24s %-8s"
+NL=$'\n'
 
 # Paths to external tools if needed
 
 # Constants to define function behavior
 topProcessCount=5
 HTMLOutput=1
+TextOutput=1
 
 cores=$(getconf _NPROCESSORS_ONLN)
 ram=$(grep 'MemTotal:' /proc/meminfo | awk '{print int($2 / 1024)}')
 hostName=$(hostname)
 hostIP=$(hostname -I)
-runDTG=$(date)
+runDTG=$(date +"%Y-%m-%d-%H:%M %Z")
 
-# Name: reportHeader
+# Report Variables - used to build report after gathering sys info
+hwBasicsHTML=""
+hwBasicsText=""
+topProcStatsHTML=""
+topProcStatsText=""
+diskStatsHTML=""
+diskStatsText=""
+dockerStatsHTML=""
+dockerStatsText=""
+packageChangeStatsHTML=""
+packageChangeStatsText=""
+recentUserStatsHTML=""
+recentUserStatsText=""
+anomalousStatsHTML=""
+anomalousStatsText=""
+syslogStatsHTML=""
+syslogStatsText=""
+#suggestionsHTML=""
+#suggestionsText=""
+
+
+# Name: reportHWBasicStats
 # Parameters: none
 # Description: Print report header with machine type and resource info
-function reportHeader
+function reportHWBasicStats
 {
-  printf "\n\n%s %s %s %s\n\n" $reportLabelDivider "$hostName" "Status Report" \
-    $reportLabelDivider
-  printf "Report Run Time: %s\n" "$runDTG"
-  printf "Hardware Resources: %s CPU cores | %s MB RAM %s\n" "$cores" "$ram"
+  hwBasicsText+="Report Run Time: ${runDTG}${NL}"
+  hwBasicsText+="Hardware Resources: ${cores} CPU cores | ${ram} MB RAM ${NL}"
   vmtype=$(systemd-detect-virt)
   if [[ $? -eq 0 ]]; then
-    printf "Virtualization: Machine is a VM with \"%s\" type virtualization.\n" "$vmtype"
+    hwBasicsText+="Virtualization: Machine is a VM with \"${vmtype}\" type virtualization.${NL}"
   else
-    printf "Virtualization: No virtualization detected.\n"
+    hwBasicsText+="Virtualization: No virtualization detected.${NL}"
   fi
-  printf "Hostname: %s\n" "$hostName"
-  printf "Host IPs: %s\n" "$hostIP"
+  hwBasicsText+="Hostname: ${hostName}${NL}"
+  hwBasicsText+="Host IPs: ${hostIP}${NL}"
   # TODO make cmd below support more platforms
-  printf "OS Name and Version: %s\n" "$(cat /etc/redhat-release)"
+  hwBasicsText+="OS Name and Version: $(cat /etc/redhat-release)${NL}"
+  hwBasicsHTML+=$hwBasicsText
+  printf "%s" "$hwBasicsText"
+  #printf "%s" "$hwBasicsHTML"
 }
+
 
 # Name: reportTopProcesses
 # Parameters: none
 # Description: Report on processes consuming the most RAM and CPU
 function reportTopProcesses()
 {
-  printf "\n%s %s %s\n" "$subReportHeader" "Top Processes" "$subReportHeader" 
   # Add one to topProcessCount to account for showing the header line.
   processLinesToShow=$(($topProcessCount+1))
-  printf "Top %s processes by CPU\n" $topProcessCount
-  ps -Ao pcpu,comm,pid,user,uid,pmem,cmd --sort=-pcpu | head -n $processLinesToShow
-  printf "\nTop %s processes by RAM\n" $topProcessCount
-  ps -Ao pmem,pcpu,comm,pid,user,uid,cmd --sort=-pmem | head -n $processLinesToShow
+  mkfifo tpPipe
+  textOut="${subReportHeader}Top Processes${subReportHeader}${NL}"
+  htmlOut="<table>"
+  IFS=$'\n'
+  textOut+="Top ${topProcessCount} processes by CPU${NL}"
+  ps -Ao pcpu,comm,pid,user,uid,pmem,cmd --sort=-pcpu | \
+    head -n $processLinesToShow > tpPipe &
+  while read -r line;
+  do
+    htmlOut+="<tr><td>$line</td></tr>"
+    textOut+="${line}${NL}"
+  done < tpPipe
+  htmlOut+="</table>"
+  rm tpPipe
+
+  mkfifo tpPipe
+  htmlOut+="<table>"
+  textOut+="Top ${topProcessCount} processes by RAM${NL}"
+  ps -Ao pmem,pcpu,comm,pid,user,uid,cmd --sort=-pmem | \
+    head -n $processLinesToShow > tpPipe &
+  while read -r line;
+  do
+    htmlOut+="<tr><td>$line</td></tr>"
+    textOut+="${line}${NL}"
+  done < tpPipe
+  htmlOut+="</table>"
+  rm tpPipe
+  topProcStatsText=$textOut
+  topProcStatsHTML=$htmlOut
+  printf "\ntopProcStatsHTML out: %s\n" "$topProcStatsHTML"
+  #printf "\ntext out: %s\n" "$textOut"
 }
 
 
@@ -72,9 +123,69 @@ function reportTopProcesses()
 # Description: Report on disk status, usage and mounts
 function reportDiskStatus()
 {
-  printf "\n%s %s %s\n" "$subReportHeader" "Disk Status" "$subReportHeader" 
-  printf "Disk Status using \"df -kh\"\n"
-  df -kh
+  mkfifo dfPipe
+  htmlOut="<table>"
+  textOut="***Disk Space***\n"
+  IFS=$'\n'
+  df -h | grep -vE \
+    "^Filesystem|\/sys\/|^cdrom|^cgroup|^proc|^fusectl|^sunrpc|^securityfs|^pstore|^sys" \
+    | awk '{ print $6 " "$7" "$1 }' > dfPipe &
+
+  while read -r line;
+  do
+    htmlOut+="<tr><td>$line</td></tr>"
+    textOut+="${line}${NL}"
+  done < dfPipe
+  htmlOut+="</table>"
+  #printf "\nhtml out: %s\n" "$htmlOut"
+  #printf "\ntext out: %s\n" "$textOut"
+  rm dfPipe
+  diskStatsText=$textOut
+  diskStatsHTML=$htmlOut
+  printf "%s\n\n" "$diskStatsText"
+  #printf "HTML is %s\n\n" "$diskStatsHTML"
+}
+
+
+# Name: reportDockerStatus
+# Parameters: none
+# Description: Report on disk status, usage and mounts
+function reportDockerStatus()
+{
+  htmlOut="<table>"
+  textOut="${subReportHeader}Docker Stats${subReportHeader}${NL}"
+  # Add one to topProcessCount to account for showing the header line.
+  processLinesToShow=$(($topProcessCount+1))
+  mkfifo tpPipe
+  IFS=$'\n'
+  textOut+="Top ${topProcessCount} processes by CPU${NL}"
+  ps -Ao pcpu,comm,pid,user,uid,pmem,cmd --sort=-pcpu | \
+    head -n $processLinesToShow > tpPipe &
+  while read -r line;
+  do
+    htmlOut+="<tr><td>$line</td></tr>"
+    textOut+="${line}${NL}"
+  done < tpPipe
+  htmlOut+="</table>"
+  #printf "\nhtml out: %s\n" "$htmlOut"
+  #printf "\ntext out: %s\n" "$textOut"
+  rm tpPipe
+  mkfifo tpPipe
+  htmlOut+="<table>"
+  textOut+="Top ${topProcessCount} processes by RAM${NL}"
+  ps -Ao pmem,pcpu,comm,pid,user,uid,cmd --sort=-pmem | \
+    head -n $processLinesToShow > tpPipe &
+  while read -r line;
+  do
+    htmlOut+="<tr><td>$line</td></tr>"
+    textOut+="${line}${NL}"
+  done < tpPipe
+  htmlOut+="</table>"
+  #printf "\nhtml out: %s\n" "$htmlOut"
+  #printf "\ntext out: %s\n" "$textOut"
+  rm tpPipe
+  dockerStatsText=$textOut
+  dockerStatsHTML=$htmlOut
 }
 
 
@@ -119,7 +230,7 @@ function reportRecentPackageChanges()
 # Description: Report current system status
 function reportRecentEvents
 {
-  printf "\n%s %s %s\n" $reportLabelDivider "Recent System Events" $reportLabelDivider
+  printf "\n%s %s %s\n" "$reportLabelDivider" "Recent System Events" "$reportLabelDivider"
 
 }
 
@@ -129,50 +240,18 @@ function reportRecentEvents
 # Description: Report current system status
 function reportSuggestions
 {
-  printf "\n%s %s %s\n" $reportLabelDivider "Troubleshooting Suggestions" $reportLabelDivider
+  #printf "\n%s %s %s\n" $reportLabelDivider "Troubleshooting Suggestions" $reportLabelDivider"
   printf "\nSuggestions not yet implemented\n"
 
 }
 
-
-# Name: reportFooter
-# Parameters: none
-# Description: Report on processes consuming the most RAM and CPU
-function reportFooter
-{
-  printf "\n%s %s %s\n" $reportLabelDivider "End System Status Report" $reportLabelDivider
-}
-
-# Name: createHTMLHeader
-# Parameters: pageTitle 
-# Description: Outputs a basic HTML header with style info.
-function createHTMLHeader
-{
-  header="<!DOCTYPE html><html><head><title>"
-  header+=$1
-  header+="</title></head>"
-  header+="<style>"
-  header+="</style>"
-  header+="<body>"
-  printf "%s" "$header"
-}
-
-# Name: createHTMLFooter
-# Parameters: pageTitle 
-# Description: Outputs a basic HTML footer
-function createHTMLFooter
-{
-  footer="</body></html>"
-  printf "%s" $footer
-}
 
 # Name: createHTMLTOC
 # Parameters: 
 # Description: Outputs a HTML TOC
 function createHTMLTOC
 {
-  toc="<div id=\"toc\"><p class=\"tocTitle\">Machine Status Report</p>"
-  toc+="<ul class=\"tocList\">"
+  toc="<ul class=\"tocList\">"
   toc+="<li><a href="#BasicInfo">Basic Machine Info</a></li>"
   toc+="<li><a href="#TopProcesses">Top Processes</a></li>"
   toc+="<li><a href="#DiskStats">Disk Stats</a></li>"
@@ -180,18 +259,93 @@ function createHTMLTOC
   printf "%s" "$toc"
 }
 
-# Name: createHTMLBody
+
+# Name: gatherInfo
 # Parameters: 
-# Description: Outputs a HTML Body
-function createHTMLBody
+# Description: Run functions that gather the sys info
+function gatherInfo
 {
-  body="<h4 id=\"#BasicInfo\">Basic Machine Info</h4>"
-  body+="<p><a href="#toc">Back to Top</a></p>"
-  body+="<h4 id=\"#TopProcesses\">Top Processes</h4>"
-  body+="<p><a href="#toc">Back to Top</a></p>"
-  body+="<h4 id=\"#DiskStats\">Disk Stats</h4>"
-  body+="<p><a href="#toc">Back to Top</a></p>"
-  printf "%s" "$body"
+  reportHWBasicStats
+  reportDiskStatus
+  reportTopProcesses
+  reportDockerStatus
+  #reportAnomalousProcesses
+  reportRecentUsers
+  reportRecentPackageChanges
+  #reportRecentEvents
+  #reportSuggestions
+}
+
+
+# Name: createHTMLReport
+# Description: Build the HTML report output file
+function createHTMLReport
+{
+  printf "Creating HTML Output\n"
+  htmlPage="<!DOCTYPE html><html><head><title>"
+  htmlPage+="Status Report"
+  htmlPage+="</title></head>"
+  htmlPage+="<style>"
+  htmlPage+="table, th, td { border: 1px solid black; }"
+  htmlPage+="h2 { text-align: center; }"
+  htmlPage+=".sectionTitle { border: 5px blue; background-color: lightblue;"
+  htmlPage+="text-align: center; font-weight: bold;}"
+  htmlPage+="</style>"
+  htmlPage+="<body>"
+  htmlPage+="<div id=\"toc\"><h2><p class=\"pageTitle\">Machine Status Report</p></h2>"
+  htmlPage+=$(createHTMLTOC)
+  htmlPage+="<div id=\"BasicInfo\"><p class=\"sectionTitle\">Basic Hardware Info</p>"
+  htmlPage+="${hwBasicsHTML}"
+  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="</div>"
+  htmlPage+="<div id=\"DiskStats\"><p class=\"sectionTitle\">Disk Stats</p>"
+  htmlPage+="$diskStatsHTML"
+  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="</div>"
+  htmlPage+="<div id=\"TopProcesses\"><p class=\"sectionTitle\">Top Processes</p>"
+  htmlPage+="$topProcStatsHTML"
+  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="</div>"
+  htmlPage+="<div id=\"DockerStats\"><p class=\"sectionTitle\">Docker Stats</p>"
+  htmlPage+="$dockerStatsHTML"
+  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="</div>"
+  htmlPage+="<div id=\"PackageChanges\"><p class=\"sectionTitle\">Package Changes</p>"
+  htmlPage+="$packageChangeStatsHTML"
+  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="</div>"
+  htmlPage+="<div id=\"RecentUsers\"><p class=\"sectionTitle\">Recent Users</p>"
+  htmlPage+="$recentUserStatsHTML"
+  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="</div>"
+  #htmlPage+="$anomalousStatsHTML"
+  htmlPage+="<div id=\"Syslog\"><p class=\"sectionTitle\">Syslog</p>"
+  htmlPage+="$syslogStatsHTML"
+  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="</div>"
+  #htmlPage+="$suggestionsHTML"
+  htmlPage+="</body></html>"
+  echo $htmlPage >./test.html
+}
+
+# Name: createTextReport
+# Parameters: 
+# Description: Build the Text report output file
+function createTextReport
+{
+  printf "Creating Text Output\n"
+  textOut="${NL}${NL}${reportLabelDivider} ${hostName} Status Report ${reportLabelDivider}${NL}"
+#hwBasicsText=""
+#topProcStatsText=""
+#diskStatsText=""
+#dockerStatsText=""
+#packageChangeStatsText=""
+#recentUserStatsText=""
+#anomalousStatsText=""
+#syslogStatsText=""
+#suggestionsText=""
+#footerText=""
+  echo $textOut
 }
 
 # Trap ctrl + c 
@@ -208,31 +362,14 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
-
-reportHeader
-
-reportTopProcesses
-
-reportDiskStatus
-
-reportAnomalousProcesses
-
-reportRecentUsers
-
-reportRecentPackageChanges
-
-reportRecentEvents
-
-reportSuggestions
-
-reportFooter
+#Run the sys info gathering functions
+gatherInfo
 
 if (( $HTMLOutput != 0 )); then
-  printf "Creating HTML Output\n"
-  htmlPage=$(createHTMLHeader "Test File")
-  htmlPage+=$(createHTMLTOC)
-  htmlPage+=$(createHTMLBody)
-  htmlPage+=$(createHTMLFooter)
-  echo $htmlPage >./test.html
+  createHTMLReport
+fi
+
+if (( $TextOutput != 0 )); then
+  createTextReport
 fi
 
