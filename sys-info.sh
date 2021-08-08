@@ -64,8 +64,6 @@ syslogStatsText=""
 function reportHWBasicStats
 {
   htmlOut="<table>"
-  hwBasicsText="Report Run Time: ${runDTG}${NL}"
-  htmlOut+="<tr><th>Report Run Time</th><td>${runDTG}</td></tr>"
   hwBasicsText+="Hardware Resources: ${cores} CPU cores | ${ram} MB RAM ${NL}"
   htmlOut+="<tr><th>CPU Cores</th><td>${cores}</td></tr>"
   htmlOut+="<tr><th>RAM (MB)</th><td>${ram}</td></tr>"
@@ -158,7 +156,7 @@ function reportDiskStats()
   IFS=" "
   while read -r fileSystem size used avail percentUsed mountedOn
   do
-    printf "%s\n" "$fileSystem | $size | $used | $avail | $percentUsed | $mountedOn"
+    #printf "%s\n" "$fileSystem | $size | $used | $avail | $percentUsed | $mountedOn"
     htmlOut+="<tr><td>${percentUsed}</td><td>${size}</td><td>${mountedOn}</td>"
     htmlOut+="<td>${fileSystem}</td></tr>"
     textOut+="${percentUsed} | ${size} | ${mountedOn} | ${fileSystem}${NL}"
@@ -183,37 +181,23 @@ function reportDockerStatus()
     dockerStatsHTML="Docker not installed"
     return -1
   fi
-return 0
-  htmlOut="<table>"
-  textOut="${subReportHeader}Docker Stats${subReportHeader}${NL}"
-  mkfifo psPipe
-  IFS=$'\n'
-  textOut+="\"docker ps\" Output${NL}"
-  #docker ps -a pcpu,comm,pid,user,uid,pmem,cmd --sort=-pcpu | \
-  #  head -n $processLinesToShow > tpPipe &
-  while read -r line;
+
+  #htmlOut="<table><tr><th>Container ID</th><th>Image</th><th>Command</th><th>Created</th>"
+  #htmlOut+="<th>Status</th><th>Ports</th><th>Names</th></tr>"
+  htmlOut="<table><tr><th>Container ID</th><th>Image</th><th>Command | Created | Status | Ports | Names</th></tr>"
+  textOut="***Docker Status***\n"
+  IFS=" "
+  while read -r id image command created status ports names
   do
-    htmlOut+="<tr><td>$line</td></tr>"
-    textOut+="${line}${NL}"
-  done < psPipe
+    htmlOut+="<tr><td>${id}</td><td>${image}</td><td>${command} ${created} ${status} ${ports} ${names}</td></tr>"
+    #htmlOut+="<tr><td>${id}</td><td>${image}</td><td>${command}</td>"
+    #htmlOut+="<td>${created}</td><td>${status}</td><td>${ports}</td>"
+    #htmlOut+="<td>${names}</td></tr>"
+    textOut+="${id} | ${image} | ${command} | ${created} | ${status} | ${ports}${NL}"
+    textOut+="| ${names}${NL}"
+  done <<< $(docker ps -a | sed '1d')
+
   htmlOut+="</table>"
-  #printf "\nhtml out: %s\n" "$htmlOut"
-  #printf "\ntext out: %s\n" "$textOut"
-  rm psPipe
-  mkfifo tpPipe
-  htmlOut+="<table>"
-  textOut+="Top ${topProcessCount} processes by RAM${NL}"
-  ps -Ao pmem,pcpu,comm,pid,user,uid,cmd --sort=-pmem | \
-    head -n $processLinesToShow > tpPipe &
-  while read -r line;
-  do
-    htmlOut+="<tr><td>$line</td></tr>"
-    textOut+="${line}${NL}"
-  done < tpPipe
-  htmlOut+="</table>"
-  #printf "\nhtml out: %s\n" "$htmlOut"
-  #printf "\ntext out: %s\n" "$textOut"
-  rm tpPipe
   dockerStatsText=$textOut
   dockerStatsHTML=$htmlOut
 }
@@ -236,11 +220,18 @@ function reportAnomalousProcesses()
 # Description: Report recently logged in users
 function reportRecentUsers()
 {
-  printf "\n%s %s %s\n" "$subReportHeader" "Recent Users" "$subReportHeader" 
-  printf "Current users and their activities using \"w\"\n"
-  w
-  printf "\nRecently logged in users using \"last\"\n"
-  last -F -n 10
+  htmlOut="<table><tr><th>User  port/tty  IP/Hostname  Session Start/Stop Duration</th></tr>"
+  textOut="***Recent User logins***\n"
+  IFS=" "
+  while read -r line
+  do
+    htmlOut+="<tr><td>${line}</td></tr>"
+    textOut+="${line}${NL}"
+  done <<< $(last -F -n 20)
+
+  htmlOut+="</table>"
+  recentUserStatsText=$textOut
+  recentUserStatsHTML=$htmlOut
 }
 
 
@@ -249,9 +240,19 @@ function reportRecentUsers()
 # Description: Report recent system changes via yum
 function reportRecentPackageChanges()
 {
-  printf "\n%s %s %s\n" "$subReportHeader" "Recent Package Changes" "$subReportHeader" 
-  printf "yum history\n"
-  yum history
+  htmlOut="<table><tr><th>yum history</th></tr>"
+  textOut="***Package Changes (yum history)***\n"
+  IFS=" "
+  while read -r line
+  do
+    #printf "%s\n" "$fileSystem | $size | $used | $avail | $percentUsed | $mountedOn"
+    htmlOut+="<tr><td>${line}</td></tr>"
+    textOut+="${line}${NL}"
+  done <<< $(yum history | sed '1d;3d')
+
+  htmlOut+="</table>"
+  packageChangeStatsText=$textOut
+  packageChangeStatsHTML=$htmlOut
 }
 
 
@@ -306,15 +307,18 @@ function createHTMLReport
   htmlPage+="#toc { border: 1px solid #aaa; display: table; "
   htmlPage+="margin-bottom: 1em; padding: 20px; width: auto;}"
   htmlPage+="ol, li { list-style: outside none none}"
+  htmlPage+=".backToTop {text-align: center;font-size:15px}"
+  htmlPage+=".runtime {text-align: center;font-size:15px}"
   htmlPage+="table, th, td { border: 1px solid black; border-collapse: collapse;}"
-  htmlPage+="th {text-align: left;}"
+  htmlPage+="th {text-align: left; white-space: nowrap;background:#33cc33}"
   htmlPage+="tr:nth-child(even) {background-color: #dddddd;}"
-  htmlPage+="h2, h4 { text-align: center; }"
+  htmlPage+="h2, h4 {text-align: center;}"
   htmlPage+=".sectionTitle { border: 5px blue; background-color: lightblue;"
   htmlPage+="text-align: center; font-weight: bold;}"
   htmlPage+="</style>"
   htmlPage+="<body>"
   htmlPage+="<h2><p class=\"pageTitle\">Status Report for ${hostName}</p></h2>"
+  htmlPage+="<p class=\"runtime\">Report Run Time: ${runDTG}</p>"
   htmlPage+="<div id=\"toc\"><h4>Contents</h4>"
   htmlPage+="<ol class=\"tocList\">"
   htmlPage+="<li><a href="#BasicInfo">Basic Machine Info</a></li>"
@@ -326,13 +330,13 @@ function createHTMLReport
   htmlPage+="<li><a href="#RecentUsers">Recent Users</a></li>"
   htmlPage+="<li><a href="#SysLog">Sys Logs</a></li>"
   htmlPage+="</ol></div>"
-  htmlPage+="<div id=\"BasicInfo\"><p class=\"sectionTitle\">Basic Hardware Info</p>"
+  htmlPage+="<div id=\"BasicInfo\"><p class=\"sectionTitle\">Basic Machine Info</p>"
   htmlPage+="$hwBasicsHTML"
   htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
   htmlPage+="</div>"
   htmlPage+="<div id=\"DiskStats\"><p class=\"sectionTitle\">Disk Stats</p>"
   htmlPage+="$diskStatsHTML"
-  htmlPage+="<p><a href="#toc">Back to Top</a></p>"
+  htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
   htmlPage+="</div>"
   htmlPage+="<div id=\"TopProcsByCPU\"><p class=\"sectionTitle\">Top Processes By CPU</p>"
   htmlPage+="$topProcsByCPUHTML"
@@ -346,11 +350,11 @@ function createHTMLReport
   htmlPage+="$dockerStatsHTML"
   htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
   htmlPage+="</div>"
-  htmlPage+="<div id=\"PackageChanges\"><p class=\"sectionTitle\">Package Changes</p>"
+  htmlPage+="<div id=\"PackageChanges\"><p class=\"sectionTitle\">Package Changes (yum history)</p>"
   htmlPage+="$packageChangeStatsHTML"
   htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
   htmlPage+="</div>"
-  htmlPage+="<div id=\"RecentUsers\"><p class=\"sectionTitle\">Recent Users</p>"
+  htmlPage+="<div id=\"RecentUsers\"><p class=\"sectionTitle\">Recent Users (Using \"last\")</p>"
   htmlPage+="$recentUserStatsHTML"
   htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
   htmlPage+="</div>"
