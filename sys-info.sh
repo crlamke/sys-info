@@ -19,6 +19,12 @@ subReportFooter="****************"
 headerFormat="%-10s %-13s %-13s %-24s %-8s"
 dataFormat="%-10s %-13s %-13s %-24s %-8s"
 NL=$'\n'
+TAB=$'\t'
+REDTEXT="\033[31;1m"
+BLUETEXT="\033[34;1m"
+GREENTEXT="\033[32;1m"
+YELLOWTEXT="\033[33;1m"
+COLOREND="\033[0m"
 
 # Paths to external tools if needed
 
