@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#Script Name : sys-info.sh
+#Script Name : sysreport.sh
 #Description : This script provides the system resources and configuration
 #              including RAM,CPUs, disk, last update date, uptime, ...
 #Author      : Chris Lamke
@@ -8,7 +8,7 @@
 #License     : MIT - See https://opensource.org/licenses/MIT
 #Last Update : 2021-06-26
 #Version     : 0.2
-#Usage       : sys-info.sh
+#Usage       : sysreport.sh
 #Notes       : 
 #
 
@@ -25,13 +25,19 @@ BLUETEXT="\033[34;1m"
 GREENTEXT="\033[32;1m"
 YELLOWTEXT="\033[33;1m"
 COLOREND="\033[0m"
+headerText="Test Header Text"
+headerColor="#000"
+footerText="Test Footer Text"
+footerColor="#990000"
 
 # Paths to external tools if needed
 
 # Constants to define function behavior
 topProcessCount=5
 HTMLOutput=1
-TextOutput=1
+textOutput=1
+headerOutput=1
+footerOutput=1
 
 cores=$(getconf _NPROCESSORS_ONLN)
 ram=$(grep 'MemTotal:' /proc/meminfo | awk '{print int($2 / 1024)}')
@@ -62,7 +68,6 @@ syslogStatsHTML=""
 syslogStatsText=""
 #suggestionsHTML=""
 #suggestionsText=""
-
 
 # Name: reportHWBasicStats
 # Parameters: none
@@ -181,11 +186,11 @@ function reportDiskStats()
 # Description: Report on Docker status
 function reportDockerStatus()
 {
-  # Start with check if docker enabled and then docker ps and images
-  if [ "x$(which docker)" == "x" ]; then
-    dockerStatsText="Docker not installed"
-    dockerStatsHTML="Docker not installed"
-    return -1
+  pgrep -f docker > /dev/null
+  if [[ $? -ne 0 ]]; then
+    dockerStatsText="Docker not running"
+    dockerStatsHTML="Docker not running"
+    return 1
   fi
 
   #htmlOut="<table><tr><th>Container ID</th><th>Image</th><th>Command</th><th>Created</th>"
@@ -312,6 +317,8 @@ function createHTMLReport
   htmlPage+="<style>"
   htmlPage+="#toc { border: 1px solid #aaa; display: table; "
   htmlPage+="margin-bottom: 1em; padding: 20px; width: auto;}"
+  htmlPage+=".pageHeader{text-align:center;font-size:20px;font-family:'Courier New',monospace;color:${headerColor}}"
+  htmlPage+=".pageFooter{text-align:center;font-size:20px;font-family:'Courier New',monospace;color:${footerColor}}}"
   htmlPage+="ol, li { list-style: outside none none}"
   htmlPage+=".backToTop {text-align: center;font-size:15px}"
   htmlPage+=".runtime {text-align: center;font-size:15px}"
@@ -323,6 +330,9 @@ function createHTMLReport
   htmlPage+="text-align: center; font-weight: bold;}"
   htmlPage+="</style>"
   htmlPage+="<body>"
+  if (( $headerOutput != 0 )); then
+    htmlPage+="<h3><p class=\"pageHeader\">${headerText}</p></h2>"
+  fi
   htmlPage+="<h2><p class=\"pageTitle\">Status Report for ${hostName}</p></h2>"
   htmlPage+="<p class=\"runtime\">Report Run Time: ${runDTG}</p>"
   htmlPage+="<div id=\"toc\"><h4>Contents</h4>"
@@ -370,6 +380,9 @@ function createHTMLReport
   htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
   htmlPage+="</div>"
   #htmlPage+="$suggestionsHTML"
+  if (( $footerOutput != 0 )); then
+    htmlPage+="<h3><p class=\"pageFooter\">${footerText}</p></h2>"
+  fi
   htmlPage+="</body></html>"
   echo $htmlPage >./${reportName}.html
 }
@@ -408,6 +421,9 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
+# Check whether there's existing data in /etc/sysreport
+
+
 #Run the sys info gathering functions
 gatherInfo
 
@@ -415,7 +431,7 @@ if (( $HTMLOutput != 0 )); then
   createHTMLReport
 fi
 
-if (( $TextOutput != 0 )); then
+if (( $textOutput != 0 )); then
   createTextReport
 fi
 
