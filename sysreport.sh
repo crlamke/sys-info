@@ -1,13 +1,14 @@
 #!/bin/bash
 #
 #Script Name : sysreport.sh
-#Description : This script provides the system resources and configuration
-#              including RAM,CPUs, disk, last update date, uptime, ...
+#Project Home: https://github.com/crlamke/sysreport
+#Description : This script generates a report of the current state of a system,
+#              including RAM, CPUs, disk, last update date, uptime, ...
 #Author      : Chris Lamke
 #Copyright   : 2021 Christopher R Lamke
 #License     : MIT - See https://opensource.org/licenses/MIT
-#Last Update : 2021-06-26
-#Version     : 0.2
+#Last Update : 2021-08-16
+#Version     : 0.3
 #Usage       : sysreport.sh
 #Notes       : 
 #
@@ -167,8 +168,16 @@ function reportDiskStats()
   IFS=" "
   while read -r fileSystem size used avail percentUsed mountedOn
   do
-    #printf "%s\n" "$fileSystem | $size | $used | $avail | $percentUsed | $mountedOn"
-    htmlOut+="<tr><td>${percentUsed}</td><td>${size}</td><td>${mountedOn}</td>"
+    usedInt=$(sed 's/%//' <<< $percentUsed)
+    #usedInt=$(($usedInt + 60)) # Used to test logic below and color printing
+    if [[ $usedInt -ge 90 ]]; then
+      usedColor="redText"
+    elif [[ $usedInt -ge 70 ]]; then
+      usedColor="yellowText"
+    else
+      usedColor="greenText"
+    fi
+    htmlOut+="<tr><td class=\"${usedColor}\">${percentUsed}</td><td>${size}</td><td>${mountedOn}</td>"
     htmlOut+="<td>${fileSystem}</td></tr>"
     textOut+="${percentUsed} | ${size} | ${mountedOn} | ${fileSystem}${NL}"
   done <<< $(df -khP | sed '1d')
@@ -267,6 +276,26 @@ function reportRecentPackageChanges()
 }
 
 
+# Name: reportSysLogEvents
+# Parameters: none
+# Description: Report recent syslog events
+function reportSysLogEvents()
+{
+  htmlOut="<table><tr><th>dmesg log</th></tr>"
+  textOut="***dmesg log***\n"
+  IFS=" "
+  while read -r line
+  do
+    htmlOut+="<tr><td>${line}</td></tr>"
+    textOut+="${line}${NL}"
+  done <<< $(dmesg | tail -20)
+
+  htmlOut+="</table>"
+  syslogStatsHTML=$htmlOut
+  syslogStatsText=$textOut
+}
+
+
 # Name: reportRecentEvents
 # Parameters: none
 # Description: Report current system status
@@ -301,6 +330,7 @@ function gatherInfo
   #reportAnomalousProcesses
   reportRecentUsers
   reportRecentPackageChanges
+  reportSysLogEvents
   #reportRecentEvents
   #reportSuggestions
 }
@@ -321,6 +351,7 @@ function createHTMLReport
   htmlPage+=".pageFooter{text-align:center;font-size:20px;font-family:'Courier New',monospace;color:${footerColor}}}"
   htmlPage+="ol, li { list-style: outside none none}"
   htmlPage+=".backToTop {text-align: center;font-size:15px}"
+  htmlPage+=".greenText {color: green} .yellowText {color: yellow} .redText {color: red}"
   htmlPage+=".runtime {text-align: center;font-size:15px}"
   htmlPage+="table, th, td { border: 1px solid black; border-collapse: collapse;}"
   htmlPage+="th {text-align: left; white-space: nowrap;background:#33cc33}"
