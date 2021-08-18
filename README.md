@@ -4,11 +4,11 @@ A Linux bash script useful for determining system resources and health.
 ## Inspired By
 This script is partially based on the article [Linux Performance Analysis in 60,000 Milliseconds | Netflix TechBlog](https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55), plus my experience wearing a sysadmin hat.
 
-## What sysreport currently does 
+## Current sysreport functionality 
 
 ## Planned sysreport functionality
 
-## sysreport script requirements
+## requirements to run sysreport 
 1. You must run this script as root/superuser.
 2. This script outputs HTML and text results and requires the ability to write files to the current/run directory
 3. Tools required for the script to fully run
