@@ -4,7 +4,7 @@ A Linux bash script useful for determining system resources and health.
 I'm actively working on this script and taking bug reports and suggestions for functionality. The easiest way to contact me is to tweet at me - https://twitter.com/crlamke.
 
 ## Inspired By
-This script is partially based on the article [Linux Performance Analysis in 60,000 Milliseconds | Netflix TechBlog](https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55), plus my experience wearing a sysadmin hat.
+This script is partially based on the article [Linux Performance Analysis in 60,000 Milliseconds | Netflix TechBlog](https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55), plus my experience in development, sysadmin, and security roles.
 
 ## Current functionality 
 
