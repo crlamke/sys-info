@@ -6,11 +6,11 @@ I'm actively working on this script and taking bug reports suggestions for funct
 ## Inspired By
 This script is partially based on the article [Linux Performance Analysis in 60,000 Milliseconds | Netflix TechBlog](https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55), plus my experience wearing a sysadmin hat.
 
-## Current sysreport functionality 
+## Current functionality 
 
-## Planned sysreport functionality
+## Planned functionality
 
-## requirements to run sysreport 
+## requirements to run script 
 1. You must run this script as root/superuser.
 2. This script outputs HTML and text results and requires the ability to write files to the current/run directory
 3. Tools required for the script to fully run
