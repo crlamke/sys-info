@@ -15,7 +15,10 @@ I'm actively working on this script and taking bug reports and suggestions for f
 9.    
 ## Planned functionality
 1. Generate plain text report
-2.  
+2. Add apt history (currently only RHEL/CENTOS yum history is supported)
+3. Add mem and disk deltas capability to bash monitor scripts (depends on data from each run being stored on machine)
+4. Add more detailed container monitoring 
+5. Add color key below tables with colored elements
 ## Requirements to run script 
 1. You must run this script as root/superuser.
 2. This script outputs HTML and text results and requires the ability to write files to the current/run directory
