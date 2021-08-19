@@ -7,9 +7,18 @@ I'm actively working on this script and taking bug reports and suggestions for f
 This script is partially based on the article [Linux Performance Analysis in 60,000 Milliseconds | Netflix TechBlog](https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55), plus my experience in development, sysadmin, and security roles.
 
 ## Current functionality 
-
+1. Generates single file HTML report, useful for cron based automated run and email
+2. Disk space stats
+3. Top processes by CPU
+4. Top processes by RAM
+5. Docker stats
+6. Recent package changes (e.g. yum or apt history)
+7. Recent user history
+8. Recent sys logs (currently only dmesg)
+9.    
 ## Planned functionality
-
+1. Generate plain text report
+2.  
 ## Requirements to run script 
 1. You must run this script as root/superuser.
 2. This script outputs HTML and text results and requires the ability to write files to the current/run directory
