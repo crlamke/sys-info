@@ -13,6 +13,26 @@
 #Notes       : 
 #
 
+###### Config Variables ######
+headerText="Test Header Text"
+headerColor="#000"
+footerText="Test Footer Text"
+footerColor="#990000"
+# Paths to optional history and config files
+dataRootPath="/etc/sysreport"
+historyFilePath="/etc/sysreport/history"
+configFilePath="/etc/sysreport/config"
+topProcessCount=5
+HTMLOutput=1
+textOutput=0
+headerOutput=1
+footerOutput=1
+goodDiskSpacePercentage=69
+cautionDiskSpacePercentage=70
+dangerdDiskSpacePercentage=90
+helpLinks="There isn't a help document for this script yet, but you can read details and contact the author at https://github.com/crlamke."
+
+
 # Report header and data display formats
 reportLabelDivider="********************"
 subReportHeader="****************"
@@ -26,19 +46,10 @@ BLUETEXT="\033[34;1m"
 GREENTEXT="\033[32;1m"
 YELLOWTEXT="\033[33;1m"
 COLOREND="\033[0m"
-headerText="Test Header Text"
-headerColor="#000"
-footerText="Test Footer Text"
-footerColor="#990000"
 
 # Paths to external tools if needed
 
-# Constants to define function behavior
-topProcessCount=5
-HTMLOutput=1
-textOutput=1
-headerOutput=1
-footerOutput=1
+
 
 cores=$(getconf _NPROCESSORS_ONLN)
 ram=$(grep 'MemTotal:' /proc/meminfo | awk '{print int($2 / 1024)}')
@@ -69,6 +80,35 @@ syslogStatsHTML=""
 syslogStatsText=""
 #suggestionsHTML=""
 #suggestionsText=""
+
+# Name: readConfig
+# Parameters: none
+# Description: Read the config file, if it exists.
+function readConfig
+{
+  if [ -f $serverConfigPath ]; then
+    printf "Using $serverConfigPath as server config file.\n"
+  else
+    printf "$serverConfigPath not found\n"
+    printUsage
+    exit 1
+  fi
+}
+
+# Name: readHistory
+# Parameters: none
+# Description: Read the historic data file, if it exists.
+function readHistory
+{
+  if [ -f $serverConfigPath ]; then
+    printf "Using $serverConfigPath as server config file.\n"
+  else
+    printf "$serverConfigPath not found\n"
+    printUsage
+    exit 1
+  fi
+}
+
 
 # Name: reportHWBasicStats
 # Parameters: none
