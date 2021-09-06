@@ -1,17 +1,10 @@
 #!/bin/bash
 #
-#Script Name : sysreport.sh
-#Project Home: https://github.com/crlamke/sysreport
 #Description : This script generates a report of the current state of a system,
 #              including RAM, CPUs, disk, last update date, uptime, ...
-#Author      : Chris Lamke
+#Project Home: https://github.com/crlamke/sysreport
 #Copyright   : 2021 Christopher R Lamke
 #License     : MIT - See https://opensource.org/licenses/MIT
-#Last Update : 2021-08-16
-#Version     : 0.3
-#Usage       : sysreport.sh
-#Notes       : 
-#
 
 ###### Config Variables ######
 headerText="Test Header Text"
@@ -27,10 +20,11 @@ HTMLOutput=1
 textOutput=0
 headerOutput=1
 footerOutput=1
+helpOutput=1
 goodDiskSpacePercentage=69
 cautionDiskSpacePercentage=70
 dangerdDiskSpacePercentage=90
-helpLinks="There isn't a help document for this script yet, but you can read details and contact the author at https://github.com/crlamke."
+helpContent="There isn't a help document for this script yet, but you can read details and contact the author at https://github.com/crlamke."
 
 
 # Report header and data display formats
@@ -416,6 +410,7 @@ function createHTMLReport
   htmlPage+="<li><a href="#PackageChanges">Package Changes</a></li>"
   htmlPage+="<li><a href="#RecentUsers">Recent Users</a></li>"
   htmlPage+="<li><a href="#SysLog">Sys Logs</a></li>"
+  htmlPage+="<li><a href="#Help">Report Help</a></li>"
   htmlPage+="</ol></div>"
   htmlPage+="<div id=\"BasicInfo\"><p class=\"sectionTitle\">Basic Machine Info</p>"
   htmlPage+="$hwBasicsHTML"
@@ -451,6 +446,12 @@ function createHTMLReport
   htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
   htmlPage+="</div>"
   #htmlPage+="$suggestionsHTML"
+  if (( $helpOutput != 0 )); then
+    htmlPage+="<div id=\"Help\"><p class=\"sectionTitle\">Help</p>"
+    htmlPage+="$helpContent"
+    htmlPage+="<p class=\"backToTop\"><a href="#toc">Back to Top</a></p>"
+    htmlPage+="</div>"
+  fi
   if (( $footerOutput != 0 )); then
     htmlPage+="<h3><p class=\"pageFooter\">${footerText}</p></h2>"
   fi
