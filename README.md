@@ -1,7 +1,7 @@
 # sysreport.sh
 A Linux bash script useful for determining system resources and health.
 
-I'm not actively working on this script but you can submit bug reports and suggestions for functionality. The best way to reach me is to contact me at my Mastodon account - crlamke@mastodon.social.
+I'm not actively working on this script but you can submit bug reports and suggestions for functionality. The best way to reach me is to contact me at my Mastodon account - https://mastodon.social/@crlamke.
 
 ## Current functionality 
 1. Generates single file HTML report, useful for cron based automated run and email
